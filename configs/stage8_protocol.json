@@ -1,0 +1,157 @@
+{
+  "_comment": "Stage 8 evaluation protocol. Written and hashed into data/processed/backtesting/stage8_pretest_lock.json BEFORE the reserved Test split is opened. Nothing here may be changed after Test access except through a documented amendment (scripts/10_backtest_portfolios.py --amendment).",
+  "protocol_version": "stage8-protocol-2026-10-21",
+
+  "research_question": "Does the Full EWS-enhanced portfolio (P2) improve realized downside protection and risk-adjusted performance beyond the strategic benchmark (P0) and the simpler HMM-based allocation (P1), after the conservative t+1 execution delay and transaction costs?",
+  "terminology": "Sequential out-of-sample portfolio backtest with FROZEN regime / early-warning models (no refit, no retraining schedule) and causally re-estimated portfolio risk inputs (Ledoit-Wolf covariance re-estimated at every weekly decision from returns through the decision date).",
+
+  "evaluation_window": {
+    "test_start_rule": "first session of the Stage 3 test split (split_manifest.json; expected 2020-01-02)",
+    "test_end_rule": "last session of the frozen local test split (not chosen by the researcher)",
+    "wealth_normalization": "every strategy's wealth = 1.0 at the close of the last Validation session; the first Test return is that of the first Test session",
+    "pre_test_history": "Train / Validation sessions are used only to carry the strategies' holdings and decision state forward to the Test start; their realized returns are verified for accounting but are not reported as performance"
+  },
+
+  "primary_portfolios": {
+    "P0_strategic": "frozen strategic benchmark, weekly 1% no-trade band, turnover cap 20% (Stage 7 rule, posture = benchmark)",
+    "P1_regime_aware": "role baseline_regime only; d1 = min(1, a * baseline_p_non_normal), a from the Stage 7 handoff (Train-calibrated)",
+    "P2_ews_enhanced": "role challenger_ews only; d2 = level map GREEN 0, AMBER 1/3, ORANGE 2/3, RED 1, RECOVERY 1/3"
+  },
+  "comparisons": {
+    "primary_question": "P2_ews_enhanced vs P1_regime_aware (net, 10 bps)",
+    "secondary_questions": ["P1_regime_aware vs P0_strategic", "P2_ews_enhanced vs P0_strategic"],
+    "dynamic_vs_constant": ["P1_regime_aware vs B2_constant_defensiveness", "P2_ews_enhanced vs B2_constant_defensiveness"]
+  },
+
+  "supplementary_benchmarks": {
+    "B1_60_40": {"weights": {"SPY": 0.60, "EFA": 0.0, "EEM": 0.0, "IEF": 0.40, "TIP": 0.0, "HYG": 0.0, "GLD": 0.0, "DBC": 0.0, "BIL": 0.0},
+                 "rule": "same weekly calendar and conservative_close_t_plus_1 execution; trade back to 60/40 when the one-way distance exceeds the 1% no-trade band; no turnover cap; same cost model; outside the nine-ETF mandate limits (contextual only)",
+                 "initial_holdings": "60/40 at the first decision date"},
+    "B2_constant_defensiveness": {"rule": "identical optimizer, constraints, calendar, execution and costs as P1/P2 with a CONSTANT defensiveness d", "d_source": "Stage 7 portfolio_policy_manifest.json saturation.train_mean_d2 (the matched mean Train defensiveness of P1 and P2)"},
+    "B3_strategic_buy_and_hold": {"rule": "strategic weights held from the close of the last Validation session, never rebalanced, no costs (contextual only; not a substitute for P0)"}
+  },
+
+  "initialization": {
+    "primary": "continuation: every strategy is run sequentially from its first eligible Stage 7 decision (benchmark holdings at that date) through Train and Validation; its holdings, previous target and pending order at the close of the last Validation session are carried into Test",
+    "sensitivity": "restart: every strategy holds the strategic benchmark at the close of the last Validation session (B1 holds 60/40); signals are NOT reset",
+    "boundary_week": "the calendar week containing the last Validation session is completed with Test sessions by the frozen weekly rule (decision on the last session of that Monday-Sunday week); no other decision is added"
+  },
+
+  "decision_rule": {
+    "optimizer": "Stage 7 primary policy (portfolio_optimizer.solve_policy, target_then_trade), reused without modification",
+    "pre_trade_weights_at_decision": "actual ledger holdings at the close of the decision date t (known at t). They equal the Stage 7 ex-ante proxy (previous target drifted through t) whenever the previous order was executed in full; they differ only after a hold inside the no-trade band or an execution-day projection (the Stage 7 proxy would then ignore realized drift).",
+    "risk_inputs": "Ledoit-Wolf 504 sessions, minimum 252, equilibrium expected returns (SR_b 0.30), all from simple returns dated <= t",
+    "signals": "date-t value of the portfolio's own role; intra-week signals are not acted upon"
+  },
+
+  "execution": {
+    "convention": "conservative_close_t_plus_1: decision after the close of t; execution at the close of t+1; first return of the new holdings is that of t+2; holdings held before the execution earn the return of t+1",
+    "hold_orders": "a decision inside the no-trade band is an explicit no-trade order (no execution, holdings keep drifting)",
+    "trade_orders": "at the close of t+1 compute the actual pre-trade weights (drift through t+1). If 0.5*sum|target - pre| <= the decision's turnover cap, execute the decision-time target exactly; otherwise execute pre + (cap / TO) * (target - pre) (cap-preserving straight-line projection, the Stage 7 transition rule). No t+1 signal is used.",
+    "price_assumption": "adjusted close of t+1 (adjusted total-return series; not proof of historical fills)",
+    "costs": "deducted from wealth at the execution close, pro rata across holdings, so post-trade weights equal the executed target"
+  },
+
+  "transaction_costs": {
+    "primary_bps": 10,
+    "sensitivity_bps": [5, 25],
+    "basis": "bps of GROSS traded notional = sum_i |w_post,i - w_pre,i| = 2 x one-way turnover",
+    "stress_multiplier": 2.0,
+    "stress_indicator": "trailing 21-session SPY realized volatility (simple returns through the decision date t, annualized) above the Train-calibrated threshold in the Stage 7 handoff; evaluated at t, applied to the execution at t+1; identical for every portfolio; uses no HMM / EWS role signal"
+  },
+
+  "return_accounting": {
+    "inputs": "daily log returns of adjusted closes from the split files, converted exactly to simple returns R = exp(r) - 1",
+    "portfolio_return": "R_p,t = sum_i w_i,t-1 R_i,t with the weights actually held over the session (never a weighted sum of log returns)",
+    "gross": "returns of the actual holdings before trading costs (the trading path is identical with and without costs because costs are deducted pro rata)",
+    "net": "(1 + gross_t) * (1 - cost_fraction_t) - 1 on execution sessions, gross otherwise"
+  },
+
+  "metrics": {
+    "annualization_sessions": 252,
+    "risk_free_for_evaluation": "realized daily simple return of BIL (evaluation benchmark only; never added to portfolio returns)",
+    "cagr": "wealth_T ^ (252 / T) - 1, T = number of Test sessions",
+    "volatility": "sample standard deviation of daily returns x sqrt(252)",
+    "sharpe": "mean(daily excess return over BIL) x 252 / (std(daily excess) x sqrt(252))",
+    "sortino": "mean daily excess x 252 / downside deviation; downside deviation = sqrt(mean(min(excess, 0)^2)) x sqrt(252)",
+    "calmar": "CAGR / |maximum drawdown|",
+    "max_drawdown": "minimum of wealth / running maximum - 1 on the daily net wealth path (initial 1.0 included)",
+    "var_cvar": "95% historical daily VaR / CVaR of returns (Stage 7 Rockafellar-Uryasev convention)",
+    "worst_week_month": "compounded calendar-week (Monday-Sunday) and calendar-month returns",
+    "tracking_error_information_ratio": "std / mean of daily active returns vs the reference, annualized",
+    "rolling": {"sharpe_window_sessions": 252, "volatility_window_sessions": 63}
+  },
+
+  "stress_analysis": {
+    "fixed_windows": {
+      "2020_pandemic_shock": ["2020-02-01", "2020-04-30"],
+      "2020_2021_recovery": ["2020-05-01", "2021-12-31"],
+      "2022_inflation_tightening": ["2022-01-01", "2022-12-31"],
+      "2023_onward_normalization": ["2023-01-01", null]
+    },
+    "window_origin": "calendar-month boundaries taken from the public macro chronology named in the Stage 8 brief (pandemic shock 2020, inflation / tightening 2022, later normalization); not chosen from any portfolio result",
+    "objective_events": "SPY drawdown events in Test by the frozen Stage 6 rule: onset when cumulative log return falls 5% below its running peak, re-armed above -2.5%; major events have a trough <= -10%",
+    "executable_protection": "a de-risking execution counts as protection for an event only if its EXECUTION date is before the event onset date; executions between onset and trough are reactions",
+    "de_risking_execution": "an execution that lowers the portfolio's equity weight AND leaves it at least 1 percentage point below the strategic equity weight (50%), i.e. a move into a defensive posture rather than a rebalance back to the benchmark; searched from 21 sessions before the event peak to the trough",
+    "recovery_participation": "net return from the close of the trough date over the next 63 sessions (or to the sample end), compared with P0"
+  },
+
+  "attribution": {
+    "pairs": [["P2_ews_enhanced", "P1_regime_aware"], ["P1_regime_aware", "P0_strategic"], ["P2_ews_enhanced", "P0_strategic"]],
+    "groups": {"equity": ["SPY", "EFA", "EEM"], "duration": ["IEF", "TIP"], "credit": ["HYG"], "gold": ["GLD"], "commodities": ["DBC"], "bil": ["BIL"]},
+    "method": "daily holdings-based: active_gross_t = sum_i (w_A,i,t-1 - w_B,i,t-1) R_i,t, split per group into an average-exposure part (Test-average weight difference x return; descriptive, uses the whole Test period) and a timing part (deviation from that average x return); cost effect = net active - gross active; compounding residual = terminal wealth difference - sum of daily net active returns"
+  },
+
+  "risk_matching": {
+    "regression": "r_P - rf = alpha + beta (r_P0 - rf) + e with Newey-West standard errors (alpha = return not explained by the portfolio's exposure to the strategic benchmark)",
+    "constant_defensiveness": "B2_constant_defensiveness (pre-Test d)",
+    "descriptive_normalization": "ex-post volatility-matched excess returns (scaled to P0's realized Test volatility); labelled DESCRIPTIVE, not a tradable strategy",
+    "capture": "up / down capture vs P0 and the mean return on P0's worst 5% of days"
+  },
+
+  "statistics": {
+    "paired_series": "daily net returns at 10 bps",
+    "mean_active_return": "Newey-West (Bartlett) HAC standard error, lag = floor(4 (T/100)^(2/9)), normal 95% interval, two-sided p-value; Holm adjustment across the three primary comparisons",
+    "bootstrap": {"method": "stationary bootstrap (Politis-Romano), paired across all portfolios and BIL", "mean_block_length_primary": 21, "mean_block_length_secondary": 63, "replications": 5000, "seed": 20200102, "interval": "95% percentile"},
+    "bootstrapped_statistics": ["annualized mean active return", "Sharpe difference", "Sortino difference", "CAGR difference", "volatility difference", "maximum drawdown difference (approximate: resampled paths do not preserve the full crash sequence)"],
+    "caveat": "annualized Sharpe, CAGR and maximum drawdown are path statistics, not independent observations; the number of independent stress episodes is reported"
+  },
+
+  "decision_rules": {
+    "economically_meaningful_sharpe_difference": 0.10,
+    "economically_meaningful_drawdown_reduction_pct_points": 2.0,
+    "statistically_supported": "95% stationary-bootstrap interval (block 21) of the net Sharpe difference excludes 0",
+    "robust_to_costs": "the sign of the net Sharpe difference is the same at 5, 10 and 25 bps",
+    "similar_to_constant": "|net Sharpe difference vs B2| < 0.10 and its 95% interval contains 0",
+    "explained_by_exposure": "the average-exposure part of the gross active return is larger in absolute value than the timing part (exposure-driven); otherwise timing-driven, called statistically supported only if the 95% interval of the regression alpha on the reference excludes 0",
+    "outcome_classification": {
+      "Outcome 1 - Full EWS adds credible incremental value": "P2 - P1 net Sharpe difference >= 0.10 with a 95% interval excluding 0, P2 - P0 net Sharpe interval excluding 0 on the positive side, and both robust to costs",
+      "Outcome 3 - Strategic allocation remains preferable": "both P1 - P0 and P2 - P0 net Sharpe differences <= 0 at 10 bps",
+      "Outcome 2 - Simple HMM allocation is sufficient": "not Outcome 1; P1 - P0 net Sharpe difference > 0 with a 95% interval excluding 0; and P2 - P1 difference < 0.10 or its interval contains 0",
+      "Outcome 4 - Evidence is inconclusive": "every other case"
+    }
+  },
+
+  "sensitivity": {
+    "costs_bps": [5, 10, 25],
+    "initialization": ["continuation (primary)", "restart_benchmark_at_test_start"],
+    "model_variants": {
+      "cov_lw_252": "Ledoit-Wolf on 252 sessions (Stage 7 permitted sensitivity)",
+      "cov_ewma_hl63": "EWMA covariance, half-life 63 (Stage 7 permitted sensitivity)",
+      "mapping_P1_full_range_P2_continuous": "d1 = p, d2 = continuous EWS score map (Stage 7 permitted sensitivity)"
+    },
+    "model_variant_protocol": "each variant and its reference restart from the strategic benchmark at the Test start; robustness evidence only; the primary policy is never replaced"
+  },
+
+  "release_vocabulary": {"PASS": "correctly implemented and verified", "WARN": "valid implementation with a documented limitation or non-blocking numerical warning", "FAIL": "genuine integrity, causality, accounting or constraint failure"},
+  "final_status_rule": {"BLOCKED": "any FAIL", "COMPLETE WITH LIMITATIONS": "no FAIL and at least one WARN", "COMPLETE": "all checks PASS (documented research limitations still apply)"},
+
+  "restrictions": [
+    "No frozen HMM, AR(1), AR-HMM, BOCPD or EWS parameter, threshold, weight or mapping is re-estimated or changed.",
+    "No Stage 7 policy parameter (risk budget, constraints, band, cap, penalties, solver, costs) is changed.",
+    "No new comparator, window, metric, block length or sensitivity case is added after Test access.",
+    "No grid search over risk aversion, thresholds, hazard, K, multipliers, rebalance frequency, caps or penalties.",
+    "A sensitivity variant never replaces the primary policy.",
+    "A genuine error found after Test access is corrected only as a labelled amendment that preserves the original result."
+  ]
+}

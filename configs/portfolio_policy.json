@@ -1,0 +1,132 @@
+{
+  "_comment": "Stage 7 portfolio policy. Every value carries a provenance tag: FROZEN = existing project configuration or frozen Stage 6.1 contract; PROPOSED = new Stage 7 research assumption (NOT an approved client mandate); TRAIN_CALIBRATED = computed from Train data by the code at run time (value written to the policy manifest, not here).",
+  "policy_version": "stage7-policy-2026-10-21",
+
+  "universe": {
+    "provenance": "FROZEN (configs/project.json investment_etfs)",
+    "etfs": ["SPY", "EFA", "EEM", "IEF", "TIP", "HYG", "GLD", "DBC", "BIL"],
+    "groups": {
+      "equity": ["SPY", "EFA", "EEM"],
+      "duration": ["IEF", "TIP"],
+      "credit": ["HYG"],
+      "real_assets": ["GLD", "DBC"],
+      "liquidity": ["BIL"]
+    }
+  },
+
+  "benchmark": {
+    "provenance": "FROZEN (configs/project.json strategic_weights); verified at run time, never overwritten",
+    "rebalancing": "P0 is reset to the strategic weights at every scheduled weekly decision (same calendar, execution timing and cost model as P1/P2)"
+  },
+
+  "constraints": {
+    "provenance": "PROPOSED research assumptions for a moderate-risk multi-asset mandate (project plan: single-ETF caps, equity range, maximum deviation from strategic weights, weekly turnover limit; no numbers were specified)",
+    "long_only": true,
+    "fully_invested": true,
+    "max_weight": {"SPY": 0.45, "EFA": 0.20, "EEM": 0.10, "IEF": 0.35, "TIP": 0.25, "HYG": 0.10, "GLD": 0.15, "DBC": 0.10, "BIL": 0.40},
+    "min_weight": {"SPY": 0.0, "EFA": 0.0, "EEM": 0.0, "IEF": 0.0, "TIP": 0.0, "HYG": 0.0, "GLD": 0.0, "DBC": 0.0, "BIL": 0.0},
+    "max_active_weight": 0.20,
+    "group_limits": {
+      "equity": {"min": 0.20, "max": 0.55},
+      "duration": {"min": 0.0, "max": 0.45},
+      "credit": {"min": 0.0, "max": 0.10},
+      "real_assets": {"min": 0.0, "max": 0.20},
+      "liquidity": {"min": 0.02, "max": 0.40}
+    },
+    "max_turnover_per_rebalance": 0.20,
+    "turnover_definition": "one-way turnover = 0.5 * sum_i |w_new,i - w_pretrade,i|"
+  },
+
+  "risk_estimation": {
+    "provenance": "PROPOSED; primary method fixed in advance, alternatives are robustness checks only",
+    "return_units": "daily SIMPLE returns exp(log_return) - 1; covariance and expected returns annualized with 252 sessions",
+    "primary": {"method": "ledoit_wolf", "lookback": 504, "min_observations": 252},
+    "alternatives": [
+      {"method": "sample", "lookback": 504},
+      {"method": "ewma", "halflife": 63, "lookback": 504},
+      {"method": "ledoit_wolf", "lookback": 252},
+      {"method": "ledoit_wolf", "lookback": "expanding"}
+    ],
+    "psd_floor_relative": 1e-8,
+    "annualization": 252
+  },
+
+  "expected_returns": {
+    "provenance": "PROPOSED",
+    "primary": "equilibrium",
+    "equilibrium": {
+      "description": "benchmark-implied (reverse-optimized) excess returns pi_t = (SR_b / sigma_b,t) * Sigma_t w_b; mu_t = rf_t + pi_t",
+      "benchmark_sharpe_assumption": 0.30,
+      "risk_free": "trailing mean BIL simple return over 63 sessions, annualized"
+    },
+    "sensitivity": {
+      "shrunk_historical": {"description": "mu = (1 - s) * trailing 504-session historical mean + s * equilibrium mu", "shrinkage_to_prior": 0.75},
+      "mean_uncertainty": "mu +/- 1 standard error of the trailing historical mean, applied asset by asset"
+    }
+  },
+
+  "optimizer": {
+    "provenance": "PROPOSED",
+    "objective": "posture target: maximize w'mu - (gamma/2) w'Sigma w - (lambda_tracking/2) (w-w_b)'Sigma(w-w_b) subject to the static and risk-budget constraints (no dependence on current holdings)",
+    "execution_rule": "target_then_trade: hold if 0.5*sum|w* - w_pre| <= no_trade_band and w_pre satisfies every hard constraint (a risk-budget deviation inside the band is reported as 'within no-trade band'); else trade to w* if within the turnover cap; else move toward w* along the straight line as far as the cap allows (unmet budget reported). Applied identically to P0 (posture = benchmark), P1 and P2",
+    "no_trade_band": 0.01,
+    "single_step_alternative": "maximize the posture objective - lambda_turnover * TO(w, w_pretrade) in one problem; SENSITIVITY ONLY (path dependent: the linear turnover penalty creates a no-trade region that is much wider for re-risking than for de-risking)",
+    "risk_aversion": "gamma_t = SR_b / sigma_b,t (the equilibrium risk aversion, so the unconstrained optimum is the benchmark)",
+    "turnover_penalty": {"cost_rate": 0.0010, "holding_horizon_years": 0.25, "formula": "lambda_turnover = 2 * cost_rate / holding_horizon_years (traded notional = 2 * one-way turnover)", "used_in": "single-step sensitivity and the stage-2/3 fallback only"},
+    "tracking_penalty": 2.0,
+    "solver": {"name": "scipy.optimize.minimize(method=SLSQP)", "ftol": 1e-12, "maxiter": 500, "constraint_tolerance": 1e-7},
+    "starting_points": ["pretrade", "benchmark"],
+    "fallback_policy": [
+      "1. posture target (full problem without turnover term) and the target_then_trade rule",
+      "2. if infeasible or not converged: keep every hard constraint (bounds, groups, active-weight limit, turnover cap) and give each risk-budget constraint a non-negative slack with a linear penalty of 10 per unit (turnover-limited transition); report the unmet budget",
+      "3. if that also fails: hold the pre-trade weights if they satisfy all hard constraints, else the previous target, else the benchmark; never equal weights"
+    ]
+  },
+
+  "cvar": {
+    "provenance": "PROPOSED",
+    "confidence": 0.95,
+    "scenarios": "historical daily simple-return vectors of the trailing 504 sessions available at the decision date (no scenario after the decision date)",
+    "secondary_optimizer": "linear program (Rockafellar-Uryasev): maximize w'mu - lambda_turnover TO - lambda_tracking_l1 |w - w_b|_1 subject to CVaR_95(w) <= vol_multiplier(d) * CVaR_95(w_b) and all constraints",
+    "tracking_l1_penalty": 0.02
+  },
+
+  "risk_budget": {
+    "provenance": "PROPOSED mappings, fixed in advance; one Train-calibrated scale (P1 parity)",
+    "defensiveness_to_budget": {
+      "vol_multiplier": "1 - 0.35 d   (target ex-ante volatility = vol_multiplier * benchmark ex-ante volatility at t)",
+      "equity_max": "0.55 - 0.25 d",
+      "credit_max": "0.10 - 0.05 d",
+      "liquidity_min": "0.02 + 0.18 d",
+      "turnover_cap": "0.20 + 0.10 d"
+    },
+    "coefficients": {"vol_slope": 0.35, "equity_max0": 0.55, "equity_slope": 0.25, "credit_max0": 0.10, "credit_slope": 0.05,
+                     "liquidity_min0": 0.02, "liquidity_slope": 0.18, "turnover_cap0": 0.20, "turnover_slope": 0.10},
+    "normal_volatility_reference": "benchmark ex-ante volatility at t (the project plan's ~10% is only an initial reference and is reported, not imposed)",
+    "P2_ews_levels": {"GREEN": 0.0, "AMBER": 0.3333333333333333, "ORANGE": 0.6666666666666666, "RED": 1.0, "RECOVERY": 0.3333333333333333},
+    "P2_recovery_rule": "RECOVERY keeps the AMBER posture until the frozen state machine returns to GREEN (gradual return; no immediate risk-on)",
+    "P1_mapping": "d1 = min(1, a * baseline_p_non_normal); a is TRAIN_CALIBRATED so that mean Train d1 = mean Train d2 (equal average defensiveness)",
+    "sensitivity_mappings": {
+      "P1_full_range": "d1 = baseline_p_non_normal",
+      "P2_continuous_score": "d2 = clip((challenger_ews_score - amber_out) / (red_in - amber_out), 0, 1)",
+      "steeper_volatility": "vol_multiplier = 1 - 0.50 d"
+    }
+  },
+
+  "transaction_costs": {
+    "provenance": "PROPOSED illustrative scenarios; no ETF-specific cost data are used",
+    "scenarios_bps_of_traded_notional": [5, 10, 25],
+    "default_bps": 10,
+    "components_bps": {"commission": 1, "half_spread": 4, "slippage": 5},
+    "stress_friction_multiplier": 2.0,
+    "stress_indicator": "trailing 21-session SPY realized volatility above its TRAIN_CALIBRATED Train 90th percentile (known at the decision date)"
+  },
+
+  "rebalancing": {
+    "provenance": "FROZEN (project plan: at most one rebalance per week) + Stage 6.1 execution convention",
+    "frequency": "weekly",
+    "decision_rule": "decision on the last trading session of each calendar week (Monday-Sunday) in the split calendar; a final week whose last session cannot be confirmed without the Test calendar is skipped",
+    "execution_convention": "conservative_close_t_plus_1: signal after close t, execution at close t+1, first holding return t+2",
+    "intra_week_signals": "recorded (weekly maximum severity) and reported; acted upon only at the next scheduled decision"
+  }
+}

@@ -1,0 +1,14 @@
+series_id,required,status,factor,frequency,first_obs,last_obs,observations,missing_values,median_release_lag_days,max_release_lag_days,first_usable_trade_date,max_staleness_days,availability_methods
+DGS3MO,False,ok,interest_rate,daily,2004-01-02,2026-10-16,5702,245,1.0,4,2004-01-05,4,rule:business_days=5702
+DGS2,True,ok,interest_rate,daily,2004-01-02,2026-10-16,5702,245,1.0,4,2004-01-05,4,rule:business_days=5702
+DGS10,True,ok,interest_rate,daily,2004-01-02,2026-10-16,5702,245,1.0,4,2004-01-05,4,rule:business_days=5702
+T10Y2Y,False,ok,interest_rate,daily,2004-01-02,2026-10-19,5703,245,1.0,4,2004-01-05,4,rule:business_days=5703
+T10Y3M,False,ok,interest_rate,daily,2004-01-02,2026-10-19,5703,245,1.0,4,2004-01-05,4,rule:business_days=5703
+DFII10,False,ok,inflation,daily,2004-01-02,2026-10-16,5702,245,1.0,4,2004-01-05,4,rule:business_days=5702
+T10YIE,False,ok,inflation,daily,2004-01-02,2026-10-19,5703,245,1.0,4,2004-01-05,4,rule:business_days=5703
+T5YIE,False,ok,inflation,daily,2004-01-02,2026-10-19,5703,245,1.0,4,2004-01-05,4,rule:business_days=5703
+BAA10Y,False,ok,credit,daily,2004-01-02,2026-10-16,5697,250,1.0,4,2004-01-05,4,rule:business_days=5697
+BAMLH0A0HYM2,False,ok,credit,daily,2023-10-23,2026-10-19,784,8,1.0,4,2023-10-24,4,rule:business_days=784
+NFCI,False,ok,credit,weekly,2011-05-27,2026-10-09,803,0,5.0,20,2011-06-01,26,vintage:first_release=802; fallback:pre_vintage_history=1
+CPIAUCSL,False,ok,inflation,monthly,2004-01-01,2026-09-01,272,1,44.0,59,2004-02-20,107,vintage:first_release=272
+CPILFESL,False,ok,inflation,monthly,2004-01-01,2026-09-01,272,1,44.0,59,2004-02-20,107,vintage:first_release=272

@@ -1,0 +1,88 @@
+{
+  "start_date": "2004-01-01",
+  "end_date": null,
+  "calendar_ticker": "SPY",
+
+  "investment_etfs": ["SPY", "EFA", "EEM", "IEF", "TIP", "HYG", "GLD", "DBC", "BIL"],
+  "strategic_weights": {
+    "SPY": 0.35, "EFA": 0.10, "EEM": 0.05,
+    "IEF": 0.15, "TIP": 0.10, "HYG": 0.05,
+    "GLD": 0.08, "DBC": 0.07, "BIL": 0.05
+  },
+
+  "auxiliary_tickers": {
+    "equity_style": ["QQQ", "IWM", "RSP"],
+    "credit": ["LQD"],
+    "sector_breadth": ["XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY"],
+    "volatility": ["^VIX", "^VIX3M", "^MOVE"]
+  },
+  "required_auxiliary": ["QQQ", "IWM", "LQD", "^VIX"],
+
+  "fred_series": {
+    "DGS3MO": {
+      "factor": "interest_rate", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "3-month Treasury constant maturity yield (H.15)"
+    },
+    "DGS2": {
+      "factor": "interest_rate", "frequency": "daily", "required": true,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "2-year Treasury constant maturity yield (H.15)"
+    },
+    "DGS10": {
+      "factor": "interest_rate", "frequency": "daily", "required": true,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "10-year Treasury constant maturity yield (H.15)"
+    },
+    "T10Y2Y": {
+      "factor": "interest_rate", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "10y minus 2y term spread"
+    },
+    "T10Y3M": {
+      "factor": "interest_rate", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "10y minus 3m term spread"
+    },
+    "DFII10": {
+      "factor": "inflation", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "10-year TIPS real yield"
+    },
+    "T10YIE": {
+      "factor": "inflation", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "10-year breakeven inflation"
+    },
+    "T5YIE": {
+      "factor": "inflation", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "5-year breakeven inflation"
+    },
+    "BAA10Y": {
+      "factor": "credit", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "Moody's Baa corporate yield minus 10y Treasury (long-history credit spread)"
+    },
+    "BAMLH0A0HYM2": {
+      "factor": "credit", "frequency": "daily", "required": false,
+      "availability": {"rule": "business_days", "lag": 1},
+      "description": "ICE BofA US HY OAS. FRED now serves only a rolling ~3-year window, so use for live monitoring, not the full backtest"
+    },
+    "NFCI": {
+      "factor": "credit", "frequency": "weekly", "required": false,
+      "availability": {"rule": "vintage", "fallback": {"rule": "calendar_days", "days": 5}},
+      "description": "Chicago Fed National Financial Conditions Index (revised every week, so vintages matter)"
+    },
+    "CPIAUCSL": {
+      "factor": "inflation", "frequency": "monthly", "required": false,
+      "availability": {"rule": "vintage", "fallback": {"rule": "next_month_day", "day": 20}},
+      "description": "CPI all items, SA"
+    },
+    "CPILFESL": {
+      "factor": "inflation", "frequency": "monthly", "required": false,
+      "availability": {"rule": "vintage", "fallback": {"rule": "next_month_day", "day": 20}},
+      "description": "Core CPI (ex food and energy), SA"
+    }
+  }
+}

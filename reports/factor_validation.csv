@@ -1,0 +1,7 @@
+name,status,detail
+No +/-inf values,PASS,0 infinite values
+No future leakage (truncated rebuild identical),PASS,"cutoffs 2014-04-03, 2021-02-03; max abs difference 0.00e+00"
+Macro values point-in-time,PASS,0 values with observation date after trade date; 0 daily FRED values used on their own observation date
+Factor coverage >= 95% in investment sample,PASS,equity_trend=100.0%; interest_rate=100.0%; inflation=100.0%; volatility=100.0%; liquidity_credit=97.8%
+No component > 50% of its factor's absolute signal,PASS,max share equity_trend=0.24; inflation=0.22; interest_rate=0.32; liquidity_credit=0.31; volatility=0.22
+Factors not near-identical (|rho| < 0.85),PASS,max |rho| = 0.71 (equity_trend vs liquidity_credit)

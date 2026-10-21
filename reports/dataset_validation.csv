@@ -1,0 +1,40 @@
+name,status,detail
+Index integrity: risk_factors,PASS,"5735 unique, increasing, date-only timestamps"
+Index integrity: investment_log_returns,PASS,"4878 unique, increasing, date-only timestamps"
+Index integrity: investment_prices,PASS,"4879 unique, increasing, date-only timestamps"
+Index integrity: factor_components,PASS,"5735 unique, increasing, date-only timestamps"
+Partitions mutually exclusive,PASS,0 dates appear in more than one partition
+Partitions collectively exhaustive over usable sample,PASS,4772 usable dates; 0 unassigned; 0 unexpected
+Partitions chronological and inside configured boundaries,PASS,train [2007-10-30..2015-12-31] < validation [2016-01-04..2019-12-31] < test [2020-01-02..2026-10-19]
+No empty partition,PASS,empty: none
+Identical factor schema across splits (no target / forward-return columns),PASS,"5 columns: equity_trend, interest_rate, inflation, volatility, liquidity_credit"
+Identical ETF return schema across splits,PASS,"9 columns: SPY, EFA, EEM, IEF, TIP, HYG, GLD, DBC, BIL"
+Feature and return dates identical within each split (contemporaneous storage),PASS,mismatched: none
+All split dates are SPY master-calendar sessions,PASS,0 off-calendar dates
+No master-calendar session missing inside the usable span,PASS,0 sessions missing
+Excluded dates inside split range are explained (leading block only),PASS,missing factor value: liquidity_credit: 106; no return row (e.g. first price date: return undefined): 1
+No NaN / +/-inf in split files,PASS,0 non-finite values
+First eligible return date,PASS,first common price date 2007-05-30 (binding ETF: BIL); first return 2007-05-31 (next session 2007-05-31); matches protocol-documented 2007-05-31
+First usable modelling row (all factors and returns present),PASS,2007-10-30: 106 sessions after the first return (2007-05-31..2007-10-29) are excluded because liquidity_credit is missing on 106 sessions; matches the effective train start accepted in the protocol (2007-10-30); configured boundary unchanged
+Returns = same-day log price differences log(P_t/P_t-1) (no shift / fill),PASS,max abs difference 1.0e-16 over 4878 dates
+No missing investment prices (nothing to forward-fill),PASS,0 missing prices in the investment panel
+No stale-price runs (>= 5 consecutive zero returns),WARN,BIL: longest run 18 (2011-07-25..2011-08-17); zero daily returns can be genuine for a T-bill fund (BIL) when yields are near zero and prices are quoted to two decimals - check the dates against a second source
+No factor value without underlying components (no fill),PASS,every factor value is backed by >= 1 component on the same date
+Stored factor files reproduce from current code and inputs (serialization only),PASS,max abs diff 5.0e-07 (6-decimal CSV; tolerance 1e-06); NaN-pattern mismatches 0
+Prefix invariance: removing later data leaves history unchanged,PASS,"6 cutoffs (2006-06-30, 2011-12-30, 2015-12-31, 2017-12-29, 2019-12-31, 2023-06-30); max abs diff 0.0e+00; NaN-pattern mismatches 0"
+Prefix invariance: altering later data leaves history unchanged,PASS,"2 cutoffs (2015-12-31, 2019-12-31); max abs diff 0.0e+00; NaN-pattern mismatches 0"
+Prefix invariance: initial features (features.py),PASS,"truncated vs full max abs diff 0.0e+00, NaN mismatches 0; stored vs rebuilt 8.9e-16"
+Stored macro_pit reproduces from the release log,PASS,13 series; max abs diff 0.0e+00
+Macro PIT alignment uses only releases known by each cutoff,PASS,6 cutoffs x 13 series; max abs diff 0.0e+00; NaN mismatches 0
+No macro observation dated after the trade date,PASS,0 violations
+Daily FRED values lag their observation date by >= 1 session,PASS,0 violations
+Macro values used only after their availability date,PASS,0 trade-day values used before availability; 0 values not traceable to the release log
+CPI / Core CPI / NFCI: every value used is a verified first release (category A),WARN,"NFCI: category A from 2011-06-08 (train A 55.9% / B-C 0.2% / no value 43.9%, validation A 100.0% / B-C 0.0% / no value 0.0%, test A 100.0% / B-C 0.0% / no value 0.0%); CPIAUCSL: category A from 2007-10-30 (train A 100.0% / B-C 0.0% / no value 0.0%, validation A 100.0% / B-C 0.0% / no value 0.0%, test A 100.0% / B-C 0.0% / no value 0.0%); CPILFESL: category A from 2007-10-30 (train A 100.0% / B-C 0.0% / no value 0.0%, validation A 100.0% / B-C 0.0% / no value 0.0%, test A 100.0% / B-C 0.0% / no value 0.0%); B/C values are used on some trade days and are not verifiable as point-in-time; NFCI has no real-time value on part of the sample: the component is absent there (not filled), which shortens its history instead of using unverifiable values"
+Daily FRED series timing (category D) is a conservative assumption,WARN,availability = observation date + 1 US business day; no publication timestamps recorded; values are current vintage
+Historical revisions of daily FRED series checked against ALFRED vintages,NOT RUN,daily-series vintages were not downloaded
+Release time of day versus signal formation (after US close),WARN,"availability is date-level only; scheduled 08:30 ET releases (CPI, NFCI) precede the 16:00 ET close, and daily series are used one session later, but exact timestamps are not in the data"
+Factor composition stable in validation and test,PASS,none
+Composition changes inside train create no artificial jump,PASS,"2 changes: liquidity_credit 2008-01-09 +[hyg_vs_lqd_63d] -[-] effect 0.349; liquidity_credit 2011-11-29 +[nfci] -[-] effect 0.092; corr(full set, early subset): liquidity_credit 0.894"
+Train: no near-constant factor,PASS,min std 0.654; max share of a single value 0.6%
+Train: no duplicate factor columns,PASS,none
+"Train: no severe multicollinearity (VIF < 10, |rho| < 0.9)",PASS,max VIF 3.18 (liquidity_credit); max |Pearson| 0.76 (volatility vs liquidity_credit); condition number 3.74
