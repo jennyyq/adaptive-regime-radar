@@ -22,12 +22,6 @@ The central investment question is:
 
 > **Can market-regime information and early-warning signals improve downside protection and risk-adjusted portfolio performance relative to a strategic multi-asset allocation?**
 
-The full research design is documented in:
-
-```text
-docs/Adaptive_Regime_Radar_项目方案.docx
-```
-
 ---
 
 # Research Status
